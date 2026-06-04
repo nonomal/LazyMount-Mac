@@ -100,8 +100,6 @@ SMB_MOUNT_POINT="/Volumes/${SMB_SHARE}"
 #   MAIN LOGIC
 # ====================
 
-echo "=== Mount Session Started: $(date) ==="
-
 # --- Module 1: SMB Share Mounting ---
 function mount_smb() {
     if [ "$SMB_ENABLED" != "true" ]; then
@@ -125,9 +123,10 @@ function mount_smb() {
     log "SMB" "Network OK."
 
     # 2. Mount SMB share
+    local t_start t_end
     if [ ! -d "$SMB_MOUNT_POINT" ]; then
         log "SMB" "Mounting SMB share..."
-        local t_start=$(date +%s)
+        t_start=$(date +%s)
         
         /usr/bin/osascript -e "try" -e "mount volume \"${SMB_URL}\"" -e "end try"
         
@@ -140,7 +139,7 @@ function mount_smb() {
                 return 1
             fi
         done
-        local t_end=$(date +%s)
+        t_end=$(date +%s)
         log "SMB" "SMB mounted successfully (Took $((t_end - t_start))s)."
     else
         log "SMB" "SMB already mounted."
@@ -151,12 +150,12 @@ function mount_smb() {
         if [ ! -d "/Volumes/$BUNDLE_VOLUME_NAME" ]; then
             log "SMB" "Mounting Sparse Bundle..."
             if [ -d "$BUNDLE_PATH" ]; then
-                local t_start=$(date +%s)
+                t_start=$(date +%s)
                 
                 # Use configured arguments
                 /usr/bin/hdiutil attach "$BUNDLE_PATH" "${BUNDLE_MOUNT_ARGS[@]}" -mountpoint "/Volumes/$BUNDLE_VOLUME_NAME"
                 
-                local t_end=$(date +%s)
+                t_end=$(date +%s)
                 sleep 1
                 
                 if [ -d "/Volumes/$BUNDLE_VOLUME_NAME" ]; then
@@ -235,6 +234,7 @@ function mount_rclone() {
     if [ -d "$RCLONE_MOUNT_POINT" ]; then
         log "Rclone" "Cleaning up old mount..."
         if /usr/sbin/diskutil unmount force "$RCLONE_MOUNT_POINT" 2>/dev/null; then
+            log "Rclone" "Old mount unmounted successfully."
             sleep 2
         else
             log "Rclone" "WARNING: diskutil unmount failed. Checking if still mounted..."
@@ -270,6 +270,8 @@ function mount_rclone() {
 # ====================
 #   Main Execution
 # ====================
+
+echo "=== Mount Session Started: $(date) ==="
 
 # Run SMB mounting in background
 mount_smb &
