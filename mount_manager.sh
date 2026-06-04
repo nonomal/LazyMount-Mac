@@ -77,9 +77,16 @@ BUNDLE_MOUNT_ARGS=("-autofsck" "-verify" "-owners" "off")
 # ====================
 # This allows users to override the default configuration without modifying this main script,
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Redirect all output to log file (before config load so all messages are captured)
+exec 1>>"$LOG_FILE" 2>&1
+
+# --- Global log function ---
+log() { echo "$(date +'%H:%M:%S') [$1] $2"; }
+
 if [ -f "$SCRIPT_DIR/mount_manager.local.sh" ]; then
     source "$SCRIPT_DIR/mount_manager.local.sh"
-    echo "Loaded external config: mount_manager.local.sh"
+    log "Init" "Loaded external config: mount_manager.local.sh"
 fi
 
 # ====================
@@ -87,49 +94,39 @@ fi
 # ====================
 # Dynamic Variables
 SMB_URL="smb://${SMB_USER}@${SMB_IP}/${SMB_SHARE}"
-if [ -n "$SMB_SHARE_PATH" ]; then
-    # Support for subfolders in SMB share if needed
-    SMB_MOUNT_POINT="/Volumes/${SMB_SHARE}"
-else
-    SMB_MOUNT_POINT="/Volumes/${SMB_SHARE}"
-fi
+SMB_MOUNT_POINT="/Volumes/${SMB_SHARE}"
 
 # ====================
 #   MAIN LOGIC
 # ====================
 
-# Redirect all output to log file
-exec 1>>"$LOG_FILE" 2>&1
-
 echo "=== Mount Session Started: $(date) ==="
 
 # --- Module 1: SMB Share Mounting ---
 function mount_smb() {
-    log() { echo "$(date +'%H:%M:%S') [SMB] $1"; }
-    
     if [ "$SMB_ENABLED" != "true" ]; then
-        log "SMB mounting disabled. Skipping."
+        log "SMB" "SMB mounting disabled. Skipping."
         return 0
     fi
     
-    log "Starting sequence..."
+    log "SMB" "Starting sequence..."
     
     # 1. Network detection
     local max_retries=60
     local count=0
-    while ! ping -c 1 -W 1 $SMB_IP &> /dev/null; do
+    while ! /sbin/ping -c 1 -W 1 "$SMB_IP" &> /dev/null; do
         if [ $count -ge $max_retries ]; then
-            log "Error: Network timeout ($SMB_IP). Giving up."
+            log "SMB" "Error: Network timeout ($SMB_IP). Giving up."
             return 1
         fi
         sleep 2
         ((count++))
     done
-    log "Network OK."
+    log "SMB" "Network OK."
 
     # 2. Mount SMB share
     if [ ! -d "$SMB_MOUNT_POINT" ]; then
-        log "Mounting SMB share..."
+        log "SMB" "Mounting SMB share..."
         local t_start=$(date +%s)
         
         /usr/bin/osascript -e "try" -e "mount volume \"${SMB_URL}\"" -e "end try"
@@ -139,20 +136,20 @@ function mount_smb() {
             sleep 1
             ((wait_count++))
             if [ $wait_count -gt 30 ]; then 
-                log "Error: SMB mount timeout."
+                log "SMB" "Error: SMB mount timeout."
                 return 1
             fi
         done
         local t_end=$(date +%s)
-        log "SMB mounted successfully (Took $((t_end - t_start))s)."
+        log "SMB" "SMB mounted successfully (Took $((t_end - t_start))s)."
     else
-        log "SMB already mounted."
+        log "SMB" "SMB already mounted."
     fi
 
     # 3. Mount sparse bundle (optional)
     if [ -n "$BUNDLE_PATH" ] && [ -n "$BUNDLE_VOLUME_NAME" ]; then
         if [ ! -d "/Volumes/$BUNDLE_VOLUME_NAME" ]; then
-            log "Mounting Sparse Bundle..."
+            log "SMB" "Mounting Sparse Bundle..."
             if [ -d "$BUNDLE_PATH" ]; then
                 local t_start=$(date +%s)
                 
@@ -163,103 +160,110 @@ function mount_smb() {
                 sleep 1
                 
                 if [ -d "/Volumes/$BUNDLE_VOLUME_NAME" ]; then
-                    log "Sparse Bundle mounted successfully (Took $((t_end - t_start))s)."
+                    log "SMB" "Sparse Bundle mounted successfully (Took $((t_end - t_start))s)."
                     
                     # --- Post-mount health check ---
                     # Check if volume is writable (not stuck in read-only mode)
                     local test_file="/Volumes/$BUNDLE_VOLUME_NAME/.lazymount_write_test"
                     if touch "$test_file" 2>/dev/null; then
                         rm -f "$test_file"
-                        log "Volume is writable. Health OK."
+                        log "SMB" "Volume is writable. Health OK."
                     else
-                        log "WARNING: Volume is READ-ONLY. Running fsck + remount..."
+                        log "SMB" "WARNING: Volume is READ-ONLY. Running fsck + remount..."
                         
                         # 1. Detach the broken mount
                         /usr/bin/hdiutil detach "/Volumes/$BUNDLE_VOLUME_NAME" -force 2>/dev/null
                         sleep 2
                         
                         # 2. Attach WITHOUT mounting, to get the device node for fsck
-                        log "Attaching bundle for filesystem repair..."
+                        log "SMB" "Attaching bundle for filesystem repair..."
                         local dev_node
                         dev_node=$(/usr/bin/hdiutil attach -nomount -noverify -noautofsck "$BUNDLE_PATH" 2>&1 | grep -oE '/dev/disk[0-9]+' | head -1)
                         
                         if [ -n "$dev_node" ]; then
                             # 3. Run fsck_apfs on the raw device node
-                            log "Running fsck_apfs on $dev_node..."
+                            log "SMB" "Running fsck_apfs on $dev_node..."
                             local fsck_output
                             fsck_output=$(/sbin/fsck_apfs -q -y "$dev_node" 2>&1)
-                            log "fsck_apfs result: $fsck_output"
+                            log "SMB" "fsck_apfs result: $fsck_output"
                             
                             # 4. Detach the nomount attachment
                             /usr/bin/hdiutil detach "$dev_node" -force 2>/dev/null
                             sleep 2
                         else
-                            log "WARNING: Could not get device node for fsck. Trying diskutil repair..."
+                            log "SMB" "WARNING: Could not get device node for fsck. Trying diskutil repair..."
                         fi
                         
                         # 5. Re-attach the bundle (now with fsck already done)
-                        log "Re-attaching sparse bundle..."
+                        log "SMB" "Re-attaching sparse bundle..."
                         /usr/bin/hdiutil attach "$BUNDLE_PATH" "${BUNDLE_MOUNT_ARGS[@]}" -mountpoint "/Volumes/$BUNDLE_VOLUME_NAME"
                         sleep 2
                         
                         # 6. Verify writability
                         if touch "$test_file" 2>/dev/null; then
                             rm -f "$test_file"
-                            log "Volume is now writable after fsck repair."
+                            log "SMB" "Volume is now writable after fsck repair."
                         else
-                            log "ERROR: Volume still read-only after fsck. Manual intervention required."
+                            log "SMB" "ERROR: Volume still read-only after fsck. Manual intervention required."
                         fi
                     fi
                 else
-                    log "Error: hdiutil finished but volume not found."
+                    log "SMB" "Error: hdiutil finished but volume not found."
                 fi
             else
-                log "Error: Bundle file not found at $BUNDLE_PATH"
+                log "SMB" "Error: Bundle file not found at $BUNDLE_PATH"
                 return 1
             fi
         else
-            log "Sparse Bundle already mounted."
+            log "SMB" "Sparse Bundle already mounted."
         fi
     fi
     
-    log "Sequence finished."
+    log "SMB" "Sequence finished."
 }
 
 # --- Module 2: Rclone Cloud Storage Mounting ---
 function mount_rclone() {
     if [ "$RCLONE_ENABLED" != "true" ]; then
-        echo "$(date +'%H:%M:%S') [Rclone] Rclone mounting disabled. Skipping."
+        log "Rclone" "Rclone mounting disabled. Skipping."
         return 0
     fi
     
-    echo "$(date +'%H:%M:%S') [Rclone] Starting..."
+    log "Rclone" "Starting..."
 
     # 1. Cleanup old mount
     if [ -d "$RCLONE_MOUNT_POINT" ]; then
-        echo "$(date +'%H:%M:%S') [Rclone] Cleaning up old mount..."
-        /usr/sbin/diskutil unmount force "$RCLONE_MOUNT_POINT"
-        sleep 2
+        log "Rclone" "Cleaning up old mount..."
+        if /usr/sbin/diskutil unmount force "$RCLONE_MOUNT_POINT" 2>/dev/null; then
+            sleep 2
+        else
+            log "Rclone" "WARNING: diskutil unmount failed. Checking if still mounted..."
+            if mount | grep -qF " on ${RCLONE_MOUNT_POINT} "; then
+                log "Rclone" "ERROR: Mount point still active after unmount attempt. Aborting cleanup."
+                return 1
+            fi
+        fi
+        /bin/rm -rf "$RCLONE_MOUNT_POINT"
     fi
-    /bin/rm -rf "$RCLONE_MOUNT_POINT"
     /bin/mkdir -p "$RCLONE_MOUNT_POINT"
 
     # 2. Network detection
     local max_retries=60
     local count=0
-    echo "$(date +'%H:%M:%S') [Rclone] Checking network ($RCLONE_IP)..."
-    while ! /sbin/ping -c 1 -W 1 $RCLONE_IP &> /dev/null; do
+    log "Rclone" "Checking network ($RCLONE_IP)..."
+    while ! /sbin/ping -c 1 -W 1 "$RCLONE_IP" &> /dev/null; do
         if [ $count -ge $max_retries ]; then
-            echo "$(date +'%H:%M:%S') [Rclone] Error: Network timeout. Giving up."
+            log "Rclone" "Error: Network timeout. Giving up."
             return 1
         fi
         sleep 2
         ((count++))
     done
-    echo "$(date +'%H:%M:%S') [Rclone] Network OK."
+    log "Rclone" "Network OK."
 
     # 3. Execute mount using array arguments
     # We use "${RCLONE_MOUNT_ARGS[@]}" to properly expand the array
-    $RCLONE_BIN mount "$RCLONE_REMOTE" "$RCLONE_MOUNT_POINT" \
+    "$RCLONE_BIN" mount "$RCLONE_REMOTE" "$RCLONE_MOUNT_POINT" \
         "${RCLONE_MOUNT_ARGS[@]}"
 }
 
@@ -269,6 +273,14 @@ function mount_rclone() {
 
 # Run SMB mounting in background
 mount_smb &
+SMB_PID=$!
 
 # Run Rclone in foreground
 mount_rclone
+RCLONE_EXIT=$?
+
+# Wait for SMB background process to finish
+wait "$SMB_PID"
+SMB_EXIT=$?
+
+log "Main" "Finished. SMB exit=$SMB_EXIT, Rclone exit=$RCLONE_EXIT"

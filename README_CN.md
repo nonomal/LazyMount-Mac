@@ -14,6 +14,7 @@
 ├── 📜 [README_CN.md](README_CN.md) — 中文文档  
 ├── 📜 [LICENSE](LICENSE) — MIT 许可证  
 ├── 🛠️ [mount_manager.sh](mount_manager.sh) — 核心脚本：自动挂载 SMB/Rclone  
+├── ⚙️ [mount_manager.example.local.sh](mount_manager.example.local.sh) — 本地配置示例（复制为 `mount_manager.local.sh` 使用）  
 ├── ⚙️ [com.example.mountmanager.plist](com.example.mountmanager.plist) — 挂载脚本的 LaunchAgent 配置  
 └── 🧠 [com.ollama.startup.plist](com.ollama.startup.plist) — Ollama 服务启动配置 (AI)  
 
@@ -122,8 +123,9 @@ mkdir -p ~/Scripts
 cp mount_manager.sh ~/Scripts/
 chmod +x ~/Scripts/mount_manager.sh
 
-# 3. 编辑脚本，填入你的配置
-nano ~/Scripts/mount_manager.sh  # 或用任何编辑器
+# 3. (推荐) 创建本地配置文件，避免直接修改主脚本
+cp mount_manager.example.local.sh ~/Scripts/mount_manager.local.sh
+nano ~/Scripts/mount_manager.local.sh  # 编辑你的配置
 
 # 4. 安装 LaunchAgent 实现开机自启
 cp com.example.mountmanager.plist ~/Library/LaunchAgents/com.lazymount.plist
@@ -138,11 +140,51 @@ launchctl load ~/Library/LaunchAgents/com.lazymount.plist
 
 ## <a id="configuration"></a>⚙️ 配置说明
 
-所有配置均位于 `mount_manager.sh` 脚本顶部的 **USER CONFIGURATION** 区域。
+配置通过**本地配置文件** (`mount_manager.local.sh`) 管理，该文件会覆盖 `mount_manager.sh` 中的默认设置。这种方式将你的配置与主脚本分离，便于更新维护。
+
+### 使用本地配置文件（推荐）
+
+脚本会自动从同目录加载 `mount_manager.local.sh`（如果存在）。这样做的好处：
+- 将配置与主脚本分离
+- 更新 `mount_manager.sh` 时不会丢失你的配置
+- 通过 git 跟踪主脚本变更，同时忽略本地配置
+
+**设置方法：**
+
+```bash
+# 复制示例配置
+cp mount_manager.example.local.sh ~/Scripts/mount_manager.local.sh
+
+# 编辑你的配置
+nano ~/Scripts/mount_manager.local.sh
+```
+
+**`mount_manager.local.sh` 示例：**
+
+```bash
+# --- Rclone 配置 ---
+RCLONE_REMOTE="myremote:/path/to/folder"
+RCLONE_MOUNT_POINT="$HOME/Mounts/CloudStorage"
+
+# --- SMB 配置 ---
+SMB_IP="192.168.1.100"
+SMB_USER="your_username"
+SMB_SHARE="SharedFolder"
+
+# --- Sparse Bundle（可选）---
+BUNDLE_PATH="/Volumes/SharedFolder/my_secure_disk.sparsebundle"
+BUNDLE_VOLUME_NAME="MyPrivateDisk"
+```
+
+### 直接配置（替代方案）
+
+你也可以直接编辑 `mount_manager.sh`，但要注意更新可能会覆盖你的修改。
 
 ```bash
 nano ~/Scripts/mount_manager.sh
 ```
+
+找到 **DEFAULT CONFIGURATION** 部分来调整设置。
 
 ### Rclone 高级配置
 

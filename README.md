@@ -14,6 +14,7 @@
 ├── 📜 [README_CN.md](README_CN.md) — Chinese Documentation  
 ├── 📜 [LICENSE](LICENSE) — MIT License  
 ├── 🛠️ [mount_manager.sh](mount_manager.sh) — Core script: Auto-mounts SMB/Rclone  
+├── ⚙️ [mount_manager.example.local.sh](mount_manager.example.local.sh) — Example local config (copy to `mount_manager.local.sh`)  
 ├── ⚙️ [com.example.mountmanager.plist](com.example.mountmanager.plist) — LaunchAgent for mount script  
 └── 🧠 [com.ollama.startup.plist](com.ollama.startup.plist) — LaunchAgent for Ollama Service (AI)  
 
@@ -122,8 +123,9 @@ mkdir -p ~/Scripts
 cp mount_manager.sh ~/Scripts/
 chmod +x ~/Scripts/mount_manager.sh
 
-# 3. Edit the script with YOUR settings
-nano ~/Scripts/mount_manager.sh  # or use any editor
+# 3. (Recommended) Create local config file to avoid modifying the main script
+cp mount_manager.example.local.sh ~/Scripts/mount_manager.local.sh
+nano ~/Scripts/mount_manager.local.sh  # Edit with your settings
 
 # 4. Install LaunchAgent for auto-start
 cp com.example.mountmanager.plist ~/Library/LaunchAgents/com.lazymount.plist
@@ -138,13 +140,51 @@ launchctl load ~/Library/LaunchAgents/com.lazymount.plist
 
 ## <a id="configuration"></a>⚙️ Configuration
 
-Configuration is managed by editing variables at the top of the `mount_manager.sh` script.
+Configuration is managed through a **local config file** (`mount_manager.local.sh`) that overrides the default settings in `mount_manager.sh`. This approach keeps your settings separate from the main script, making updates easier.
+
+### Using Local Config File (Recommended)
+
+The script automatically loads `mount_manager.local.sh` from the same directory if it exists. This allows you to:
+- Keep your settings separate from the main script
+- Update `mount_manager.sh` without losing your configuration
+- Track changes to the main script via git while ignoring your local config
+
+**Setup:**
+
+```bash
+# Copy the example config
+cp mount_manager.example.local.sh ~/Scripts/mount_manager.local.sh
+
+# Edit with your settings
+nano ~/Scripts/mount_manager.local.sh
+```
+
+**Example `mount_manager.local.sh`:**
+
+```bash
+# --- Rclone Configuration ---
+RCLONE_REMOTE="myremote:/path/to/folder"
+RCLONE_MOUNT_POINT="$HOME/Mounts/CloudStorage"
+
+# --- SMB Configuration ---
+SMB_IP="192.168.1.100"
+SMB_USER="your_username"
+SMB_SHARE="SharedFolder"
+
+# --- Sparse Bundle (Optional) ---
+BUNDLE_PATH="/Volumes/SharedFolder/my_secure_disk.sparsebundle"
+BUNDLE_VOLUME_NAME="MyPrivateDisk"
+```
+
+### Direct Configuration (Alternative)
+
+You can also edit `mount_manager.sh` directly, but be aware that updates may overwrite your changes.
 
 ```bash
 nano ~/Scripts/mount_manager.sh
 ```
 
-Locate the **USER CONFIGURATION** section to adjust settings.
+Locate the **DEFAULT CONFIGURATION** section to adjust settings.
 
 ### Rclone Advanced Configuration
 
