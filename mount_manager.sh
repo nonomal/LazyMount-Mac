@@ -75,7 +75,16 @@ BUNDLE_MOUNT_ARGS=("-autofsck" "-verify" "-owners" "off")
 # ====================
 #   LOAD EXTERNAL CONFIG
 # ====================
+# This allows users to override the default configuration without modifying this main script,
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [ -f "$SCRIPT_DIR/mount_manager.local.sh" ]; then
+    source "$SCRIPT_DIR/mount_manager.local.sh"
+    echo "Loaded external config: mount_manager.local.sh"
+fi
 
+# ====================
+#   DYNAMIC VARIABLES
+# ====================
 # Dynamic Variables
 SMB_URL="smb://${SMB_USER}@${SMB_IP}/${SMB_SHARE}"
 if [ -n "$SMB_SHARE_PATH" ]; then
