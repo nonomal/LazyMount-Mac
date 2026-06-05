@@ -183,11 +183,15 @@ function check_and_update() {
 function monitor_bundle_health() {
     local volume="/Volumes/$BUNDLE_VOLUME_NAME"
     local test_file="$volume/.lazymount_health"
-    local check_interval=30
+    local check_interval=60   # Check every 60 seconds (reduced I/O pressure)
     local consecutive_failures=0
     local max_failures=3
+    local recovery_cooldown=120  # Wait 2 minutes after recovery before checking again
     
     log "Monitor" "Starting health monitor for $volume"
+    
+    # Suppress Spotlight indexing on initial start (prevents mds from hammering APFS journal)
+    /usr/bin/mdutil -i off "$volume" 2>/dev/null
     
     while true; do
         sleep "$check_interval"
@@ -210,20 +214,25 @@ function monitor_bundle_health() {
                 log "Monitor" "CRITICAL: Volume unwritable. Detach + re-attach..."
                 
                 /usr/bin/hdiutil detach "$volume" -force 2>/dev/null
-                sleep 3
+                sleep 5
                 
                 if [ -d "$BUNDLE_PATH" ]; then
                     /usr/bin/hdiutil attach "$BUNDLE_PATH" \
                         "${BUNDLE_MOUNT_ARGS[@]}" \
                         -mountpoint "$volume"
-                    sleep 2
+                    sleep 5
+                    
+                    # Immediately suppress Spotlight to prevent index storm
+                    /usr/bin/mdutil -i off "$volume" 2>/dev/null
                     
                     if touch "$test_file" 2>/dev/null; then
                         rm -f "$test_file"
-                        log "Monitor" "Volume recovered. ✅"
+                        log "Monitor" "Volume recovered. ✅ Cooling down ${recovery_cooldown}s..."
+                        # Long cooldown: let APFS journal stabilize before next check
+                        sleep "$recovery_cooldown"
                     else
                         log "Monitor" "ERROR: Still unwritable after re-attach."
-                        sleep 60
+                        sleep "$recovery_cooldown"
                     fi
                 else
                     log "Monitor" "ERROR: Bundle path inaccessible. SMB down?"
