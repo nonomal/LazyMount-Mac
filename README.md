@@ -46,9 +46,9 @@ Mac storage is **expensive** — a 1TB upgrade can cost $200+. LazyMount solves 
 - ☁️ **[Cloud Storage](#4-google-drive-dropbox-as-local-folder)** — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
 - 🧠 **[AI Model Storage](#6-ai-llm-model-storage)** — Run large LLMs (Ollama) from network storage to save 100GB+ SSD space
 
-**Key Features (v2.1):**
+**Key Features (v2.3):**
 - 🔄 **Auto-mount at login** — No manual clicking required
-- 🛡️ **Self-healing** — Background health monitor automatically recovers APFS volumes when network fails
+- 🛡️ **Self-healing** — Background health monitor detects unresponsive APFS volumes and auto-recovers (uses lightweight `df` checks, avoids false positives from APFS-over-SMB sync limitations)
 - 🌐 **Works anywhere** — Access home storage remotely via Tailscale
 - ⚡ **Dual-mode** — Supports both SMB (local) and Rclone (cloud/remote)
 - 🚀 **Fast APFS Mounting** — Bypasses slow network verification for 3x faster APFS attach times
@@ -689,6 +689,17 @@ If your Mac is not shut down gracefully (e.g., power loss, forced reboot), the A
 4. Once verified, it will work normally again.
 
 *Note: Standard SMB, Rclone, and SFTP mounts are not affected by this issue.*
+
+### APFS-over-SMB Sync Limitation (v2.3 Fix)
+APFS filesystem on SMB backing store has a known limitation: APFS periodic `sync()` calls fail with `ENOTSUP` because SMB doesn't support the required fsync semantics. This causes kernel errors like:
+
+```
+apfs_vfsop_sync:5310: disk5s1 disk5: failed to finish all transactions in sync() - Operation not supported(45)
+```
+
+**Impact:** `touch` and other write commands intermittently fail on APFS-over-SMB volumes, even when the volume is healthy. Previous versions (v2.1–v2.2) used `touch` for health checks, causing **false positives** that triggered unnecessary detach/re-attach cycles.
+
+**v2.3 Fix:** Health monitor now uses `df` (reads mount metadata, no sync triggered) instead of `touch`. Post-mount check uses `mount` flags to detect `read-only` state. This eliminates false positives while still catching genuine volume failures.
 
 ---
 

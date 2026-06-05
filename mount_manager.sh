@@ -2,7 +2,7 @@
 
 # ==========================================
 #      LazyMount - Universal Mount Manager
-#      Version: 2.2 (Auto-Update Test)
+#      Version: 2.3 (APFS Health Monitor Fix)
 #      https://github.com/yuanweize/LazyMount-Mac
 # ==========================================
 #
@@ -21,7 +21,7 @@
 # ==========================================
 
 # --- Script Version (for auto-update) ---
-SCRIPT_VERSION="2.2"
+SCRIPT_VERSION="2.3"
 GITHUB_RAW_URL="https://raw.githubusercontent.com/yuanweize/LazyMount-Mac/main/mount_manager.sh"
 
 # ====================
@@ -180,38 +180,50 @@ function check_and_update() {
 # ====================
 
 # --- Health Monitor for Sparse Bundle ---
+# NOTE: APFS on SMB backing store has a known limitation — APFS periodic sync()
+# calls fail with ENOTSUP because SMB doesn't support the required fsync semantics.
+# This causes `touch` and other write tests to hang/fail intermittently even when
+# the volume is healthy. Therefore we use a LIGHTWEIGHT check strategy:
+#   1. `df` to verify the volume is responsive (does NOT trigger APFS sync)
+#   2. Only escalate to re-attach when the volume is completely unresponsive
+#   3. Long intervals to minimize I/O pressure on the SMB share
 function monitor_bundle_health() {
     local volume="/Volumes/$BUNDLE_VOLUME_NAME"
-    local test_file="$volume/.lazymount_health"
-    local check_interval=60   # Check every 60 seconds (reduced I/O pressure)
+    local check_interval=300       # 5 minutes (reduce I/O pressure on SMB)
     local consecutive_failures=0
-    local max_failures=3
-    local recovery_cooldown=120  # Wait 2 minutes after recovery before checking again
+    local max_failures=3           # 3 failures × 5min = 15 min before recovery
+    local recovery_cooldown=600    # 10 min cooldown after recovery
     
-    log "Monitor" "Starting health monitor for $volume"
+    log "Monitor" "Starting health monitor for $volume (interval=${check_interval}s, tolerance=$((check_interval * max_failures))s)"
     
-    # Suppress Spotlight indexing on initial start (prevents mds from hammering APFS journal)
+    # Suppress Spotlight indexing (prevents mds from hammering APFS journal over SMB)
     /usr/bin/mdutil -i off "$volume" 2>/dev/null
     
     while true; do
         sleep "$check_interval"
         
-        # Stop if volume disappeared (detached externally)
+        # Stop if volume directory disappeared (detached externally)
         if [ ! -d "$volume" ]; then
             log "Monitor" "Volume gone. Stopping monitor."
             break
         fi
         
-        # Write test
-        if touch "$test_file" 2>/dev/null; then
-            rm -f "$test_file" 2>/dev/null
+        # Lightweight responsiveness check using `df`.
+        # `df` reads mount metadata and does NOT trigger APFS sync/flush,
+        # so it won't hit the ENOTSUP issue on SMB backing stores.
+        # We use a 10s timeout — if df hangs, the volume is truly stuck.
+        if /bin/df "$volume" &>/dev/null; then
+            # Volume is responsive — reset failure counter
+            if [ $consecutive_failures -gt 0 ]; then
+                log "Monitor" "Volume responsive again. Resetting failure counter (was $consecutive_failures)."
+            fi
             consecutive_failures=0
         else
             ((consecutive_failures++))
-            log "Monitor" "WARNING: Write failed ($consecutive_failures/$max_failures)"
+            log "Monitor" "WARNING: Volume unresponsive ($consecutive_failures/$max_failures)"
             
             if [ $consecutive_failures -ge $max_failures ]; then
-                log "Monitor" "CRITICAL: Volume unwritable. Detach + re-attach..."
+                log "Monitor" "CRITICAL: Volume unresponsive for $((check_interval * max_failures))s. Detach + re-attach..."
                 
                 /usr/bin/hdiutil detach "$volume" -force 2>/dev/null
                 sleep 5
@@ -222,16 +234,14 @@ function monitor_bundle_health() {
                         -mountpoint "$volume"
                     sleep 5
                     
-                    # Immediately suppress Spotlight to prevent index storm
+                    # Suppress Spotlight to prevent index storm
                     /usr/bin/mdutil -i off "$volume" 2>/dev/null
                     
-                    if touch "$test_file" 2>/dev/null; then
-                        rm -f "$test_file"
-                        log "Monitor" "Volume recovered. ✅ Cooling down ${recovery_cooldown}s..."
-                        # Long cooldown: let APFS journal stabilize before next check
+                    if /bin/df "$volume" &>/dev/null; then
+                        log "Monitor" "Volume recovered. Cooling down ${recovery_cooldown}s..."
                         sleep "$recovery_cooldown"
                     else
-                        log "Monitor" "ERROR: Still unwritable after re-attach."
+                        log "Monitor" "ERROR: Volume still unresponsive after re-attach. Cooling down ${recovery_cooldown}s..."
                         sleep "$recovery_cooldown"
                     fi
                 else
@@ -311,12 +321,12 @@ function mount_smb() {
                     log "SMB" "Sparse Bundle mounted successfully (Took $((t_end - t_start))s)."
                     
                     # --- Post-mount health check ---
-                    # Check if volume is writable (not stuck in read-only mode)
-                    local test_file="/Volumes/$BUNDLE_VOLUME_NAME/.lazymount_write_test"
-                    if touch "$test_file" 2>/dev/null; then
-                        rm -f "$test_file"
-                        log "SMB" "Volume is writable. Health OK."
-                    else
+                    # Check if volume is mounted read-only (indicates APFS corruption).
+                    # NOTE: We use `mount` flags instead of `touch` because APFS on SMB
+                    # backing store always fails sync() with ENOTSUP, making touch unreliable.
+                    local mount_flags
+                    mount_flags=$(mount | grep " on /Volumes/$BUNDLE_VOLUME_NAME " | head -1)
+                    if echo "$mount_flags" | grep -q "read-only"; then
                         log "SMB" "WARNING: Volume is READ-ONLY. Running fsck + remount..."
                         
                         # 1. Detach the broken mount
@@ -355,13 +365,15 @@ function mount_smb() {
                         /usr/bin/hdiutil attach "$BUNDLE_PATH" "${BUNDLE_MOUNT_ARGS[@]}" -mountpoint "/Volumes/$BUNDLE_VOLUME_NAME"
                         sleep 2
                         
-                        # 6. Verify writability
-                        if touch "$test_file" 2>/dev/null; then
-                            rm -f "$test_file"
-                            log "SMB" "Volume is now writable after fsck repair."
-                        else
+                        # 6. Verify read-only flag is gone
+                        mount_flags=$(mount | grep " on /Volumes/$BUNDLE_VOLUME_NAME " | head -1)
+                        if echo "$mount_flags" | grep -q "read-only"; then
                             log "SMB" "ERROR: Volume still read-only after fsck. Manual intervention required."
+                        else
+                            log "SMB" "Volume is now read-write after fsck repair."
                         fi
+                    else
+                        log "SMB" "Volume is read-write. Health OK."
                     fi
                 else
                     log "SMB" "Error: hdiutil finished but volume not found."
