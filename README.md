@@ -46,11 +46,12 @@ Mac storage is **expensive** — a 1TB upgrade can cost $200+. LazyMount solves 
 - ☁️ **[Cloud Storage](#4-google-drive-dropbox-as-local-folder)** — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
 - 🧠 **[AI Model Storage](#6-ai-llm-model-storage)** — Run large LLMs (Ollama) from network storage to save 100GB+ SSD space
 
-**Key Features:**
+**Key Features (v2.1):**
 - 🔄 **Auto-mount at login** — No manual clicking required
-- 🛡️ **Self-healing** — Reconnects automatically after network failures
+- 🛡️ **Self-healing** — Background health monitor automatically recovers APFS volumes when network fails
 - 🌐 **Works anywhere** — Access home storage remotely via Tailscale
 - ⚡ **Dual-mode** — Supports both SMB (local) and Rclone (cloud/remote)
+- 🚀 **Fast APFS Mounting** — Bypasses slow network verification for 3x faster APFS attach times
 
 ---
 
