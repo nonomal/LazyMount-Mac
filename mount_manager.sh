@@ -15,8 +15,13 @@
 #   - Auto-retry on network failure
 #   - Clean logging to single file
 #   - Works with Tailscale for remote access
+#   - Auto-update from GitHub
 #
 # ==========================================
+
+# --- Script Version (for auto-update) ---
+SCRIPT_VERSION="2.0"
+GITHUB_RAW_URL="https://raw.githubusercontent.com/yuanweize/LazyMount-Mac/main/mount_manager.sh"
 
 # ====================
 #   DEFAULT CONFIGURATION
@@ -27,6 +32,7 @@
 
 # --- Global Settings ---
 LOG_FILE="/tmp/mount_manager.log"
+AUTO_UPDATE_ENABLED="true"                         # Set to "false" to disable auto-update
 
 # --- Rclone Configuration ---
 RCLONE_ENABLED="true"
@@ -96,6 +102,65 @@ fi
 SMB_URL="smb://${SMB_USER}@${SMB_IP}/${SMB_SHARE}"
 SMB_MOUNT_POINT="/Volumes/${SMB_SHARE}"
 RCLONE_VOLNAME="$(basename "$RCLONE_MOUNT_POINT")"
+
+# ====================
+#   AUTO-UPDATE FUNCTION
+# ====================
+function check_and_update() {
+    if [ "$AUTO_UPDATE_ENABLED" != "true" ]; then
+        log "Update" "Auto-update disabled. Skipping."
+        return 0
+    fi
+    
+    log "Update" "Checking for updates (current version: $SCRIPT_VERSION)..."
+    
+    # Fetch remote script to temp file
+    local temp_script="/tmp/mount_manager_update_$$.sh"
+    if ! /usr/bin/curl -fsSL --connect-timeout 10 --max-time 30 "$GITHUB_RAW_URL" -o "$temp_script" 2>/dev/null; then
+        log "Update" "Failed to fetch remote script. Skipping update."
+        /bin/rm -f "$temp_script"
+        return 0
+    fi
+    
+    # Extract version from remote script
+    local remote_version
+    remote_version=$(grep -E '^SCRIPT_VERSION=' "$temp_script" | head -1 | cut -d'"' -f2)
+    
+    if [ -z "$remote_version" ]; then
+        log "Update" "Could not extract version from remote script. Skipping update."
+        /bin/rm -f "$temp_script"
+        return 0
+    fi
+    
+    log "Update" "Remote version: $remote_version"
+    
+    # Compare versions (simple string comparison)
+    if [ "$remote_version" = "$SCRIPT_VERSION" ]; then
+        log "Update" "Already up to date."
+        /bin/rm -f "$temp_script"
+        return 0
+    fi
+    
+    # Version differs, perform update
+    log "Update" "New version available. Updating from $SCRIPT_VERSION to $remote_version..."
+    
+    # Backup current script
+    local backup_script="${BASH_SOURCE[0]}.backup"
+    /bin/cp "${BASH_SOURCE[0]}" "$backup_script"
+    
+    # Replace script with new version
+    if /bin/mv "$temp_script" "${BASH_SOURCE[0]}"; then
+        /bin/chmod +x "${BASH_SOURCE[0]}"
+        log "Update" "Update successful. Backup saved to $backup_script"
+        log "Update" "Please restart the script to use the new version."
+        return 0
+    else
+        log "Update" "ERROR: Failed to replace script. Restoring backup..."
+        /bin/cp "$backup_script" "${BASH_SOURCE[0]}"
+        /bin/rm -f "$temp_script"
+        return 1
+    fi
+}
 
 # ====================
 #   MAIN LOGIC
@@ -274,6 +339,9 @@ function mount_rclone() {
 # ====================
 
 echo "=== Mount Session Started: $(date) ==="
+
+# Check for updates before mounting
+check_and_update
 
 # Run SMB mounting in background
 mount_smb &

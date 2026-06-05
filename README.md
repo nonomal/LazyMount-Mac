@@ -162,17 +162,21 @@ nano ~/Scripts/mount_manager.local.sh
 **Example `mount_manager.local.sh`:**
 
 ```bash
+# --- Global Settings ---
+# AUTO_UPDATE_ENABLED="true"                     # Set to "false" to disable auto-update
+
 # --- Rclone Configuration ---
 RCLONE_REMOTE="myremote:/path/to/folder"
 RCLONE_MOUNT_POINT="$HOME/Mounts/CloudStorage"
+RCLONE_IP="100.x.x.x"                            # Tailscale IP or 8.8.8.8
 
 # --- SMB Configuration ---
-SMB_IP="192.168.1.100"
+SMB_IP="192.168.1.100"                           # Tailscale IP for remote access
 SMB_USER="your_username"
 SMB_SHARE="SharedFolder"
 
 # --- Sparse Bundle (Optional) ---
-BUNDLE_PATH="/Volumes/SharedFolder/my_secure_disk.sparsebundle"
+BUNDLE_PATH="/Volumes/$SMB_SHARE/my_secure_disk.sparsebundle"
 BUNDLE_VOLUME_NAME="MyPrivateDisk"
 ```
 
@@ -228,6 +232,22 @@ For mounting disk images stored on the SMB share:
 BUNDLE_PATH="$SMB_MOUNT_POINT/Storage.sparsebundle"
 BUNDLE_VOLUME_NAME="ExternalStorage"
 ```
+
+### Auto-Update
+
+The script can automatically check for updates from GitHub on each startup.
+
+```bash
+AUTO_UPDATE_ENABLED="true"    # Set to "false" to disable
+```
+
+When enabled, the script will:
+1. Fetch the latest version from GitHub on startup
+2. Compare the remote `SCRIPT_VERSION` with the local version
+3. If a new version is available, download and replace the script automatically
+4. Save a backup as `mount_manager.sh.backup` before updating
+
+> **Note:** After an update, the script logs a message to restart. The new version takes effect on the next launch.
 
 ---
 

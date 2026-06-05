@@ -162,17 +162,21 @@ nano ~/Scripts/mount_manager.local.sh
 **`mount_manager.local.sh` 示例：**
 
 ```bash
+# --- 全局设置 ---
+# AUTO_UPDATE_ENABLED="true"                     # 设为 "false" 禁用自动更新
+
 # --- Rclone 配置 ---
 RCLONE_REMOTE="myremote:/path/to/folder"
 RCLONE_MOUNT_POINT="$HOME/Mounts/CloudStorage"
+RCLONE_IP="100.x.x.x"                            # Tailscale IP 或 8.8.8.8
 
 # --- SMB 配置 ---
-SMB_IP="192.168.1.100"
+SMB_IP="192.168.1.100"                           # 远程访问时填 Tailscale IP
 SMB_USER="your_username"
 SMB_SHARE="SharedFolder"
 
 # --- Sparse Bundle（可选）---
-BUNDLE_PATH="/Volumes/SharedFolder/my_secure_disk.sparsebundle"
+BUNDLE_PATH="/Volumes/$SMB_SHARE/my_secure_disk.sparsebundle"
 BUNDLE_VOLUME_NAME="MyPrivateDisk"
 ```
 
@@ -228,6 +232,22 @@ RCLONE_IP="100.x.x.x"            # 用于网络检测的 IP（远程访问时用
 BUNDLE_PATH="$SMB_MOUNT_POINT/Storage.sparsebundle"
 BUNDLE_VOLUME_NAME="ExternalStorage"
 ```
+
+### 自动更新
+
+脚本可以在每次启动时自动从 GitHub 检查更新。
+
+```bash
+AUTO_UPDATE_ENABLED="true"    # 设为 "false" 禁用自动更新
+```
+
+启用后，脚本会：
+1. 启动时从 GitHub 获取最新版本
+2. 比较远程 `SCRIPT_VERSION` 与本地版本
+3. 如果有新版本，自动下载并替换脚本
+4. 更新前保存备份为 `mount_manager.sh.backup`
+
+> **注意：** 更新后，脚本会记录日志提示重启。新版本将在下次启动时生效。
 
 > **⚠️ 游戏特别说明：**
 > *   Steam/Epic 游戏库 **必须** 使用 APFS 稀疏磁盘映像才能正常工作。
