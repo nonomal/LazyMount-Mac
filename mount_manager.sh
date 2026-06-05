@@ -73,10 +73,10 @@ SMB_SHARE="SharedFolder"                           # Override in .local.sh
 BUNDLE_PATH=""                                     # Override in .local.sh
 BUNDLE_VOLUME_NAME=""                              # Override in .local.sh
 # Custom hdiutil flags (e.g. -noverify, -readonly)
-# Note: -noautofsck and -noverify are REMOVED by default to ensure APFS
-# consistency on network shares. Skipping fsck can leave the volume in
-# a dirty state after unclean SMB disconnect, causing read-only mounts.
-BUNDLE_MOUNT_ARGS=("-autofsck" "-verify" "-owners" "off")
+# Note: -noautofsck is kept to ensure APFS consistency on network shares.
+# -noverify skips disk image checksum verification (not filesystem check)
+# to reduce SMB I/O load during mount. APFS integrity is handled by -autofsck.
+BUNDLE_MOUNT_ARGS=("-autofsck" "-noverify" "-owners" "off")
 
 # ====================
 #   LOAD EXTERNAL CONFIG
@@ -166,6 +166,62 @@ function check_and_update() {
 #   MAIN LOGIC
 # ====================
 
+# --- Health Monitor for Sparse Bundle ---
+function monitor_bundle_health() {
+    local volume="/Volumes/$BUNDLE_VOLUME_NAME"
+    local test_file="$volume/.lazymount_health"
+    local check_interval=30
+    local consecutive_failures=0
+    local max_failures=3
+    
+    log "Monitor" "Starting health monitor for $volume"
+    
+    while true; do
+        sleep "$check_interval"
+        
+        # Stop if volume disappeared (detached externally)
+        if [ ! -d "$volume" ]; then
+            log "Monitor" "Volume gone. Stopping monitor."
+            break
+        fi
+        
+        # Write test
+        if touch "$test_file" 2>/dev/null; then
+            rm -f "$test_file" 2>/dev/null
+            consecutive_failures=0
+        else
+            ((consecutive_failures++))
+            log "Monitor" "WARNING: Write failed ($consecutive_failures/$max_failures)"
+            
+            if [ $consecutive_failures -ge $max_failures ]; then
+                log "Monitor" "CRITICAL: Volume unwritable. Detach + re-attach..."
+                
+                /usr/bin/hdiutil detach "$volume" -force 2>/dev/null
+                sleep 3
+                
+                if [ -d "$BUNDLE_PATH" ]; then
+                    /usr/bin/hdiutil attach "$BUNDLE_PATH" \
+                        "${BUNDLE_MOUNT_ARGS[@]}" \
+                        -mountpoint "$volume"
+                    sleep 2
+                    
+                    if touch "$test_file" 2>/dev/null; then
+                        rm -f "$test_file"
+                        log "Monitor" "Volume recovered. ✅"
+                    else
+                        log "Monitor" "ERROR: Still unwritable after re-attach."
+                        sleep 60
+                    fi
+                else
+                    log "Monitor" "ERROR: Bundle path inaccessible. SMB down?"
+                    break
+                fi
+                consecutive_failures=0
+            fi
+        fi
+    done
+}
+
 # --- Module 1: SMB Share Mounting ---
 function mount_smb() {
     if [ "$SMB_ENABLED" != "true" ]; then
@@ -220,9 +276,14 @@ function mount_smb() {
                 
                 # Use configured arguments
                 /usr/bin/hdiutil attach "$BUNDLE_PATH" "${BUNDLE_MOUNT_ARGS[@]}" -mountpoint "/Volumes/$BUNDLE_VOLUME_NAME"
+                local hdiutil_exit=$?
                 
                 t_end=$(date +%s)
                 sleep 1
+                
+                if [ $hdiutil_exit -ne 0 ]; then
+                    log "SMB" "WARNING: hdiutil attach exited with code $hdiutil_exit"
+                fi
                 
                 if [ -d "/Volumes/$BUNDLE_VOLUME_NAME" ]; then
                     log "SMB" "Sparse Bundle mounted successfully (Took $((t_end - t_start))s)."
@@ -242,21 +303,29 @@ function mount_smb() {
                         
                         # 2. Attach WITHOUT mounting, to get the device node for fsck
                         log "SMB" "Attaching bundle for filesystem repair..."
-                        local dev_node
-                        dev_node=$(/usr/bin/hdiutil attach -nomount -noverify -noautofsck "$BUNDLE_PATH" 2>&1 | grep -oE '/dev/disk[0-9]+' | head -1)
+                        local attach_output dev_node whole_disk
+                        attach_output=$(/usr/bin/hdiutil attach -nomount -noverify -noautofsck "$BUNDLE_PATH" 2>&1)
+                        log "SMB" "Nomount attach output: $attach_output"
+                        # Get the APFS partition device node (e.g. /dev/disk5s1)
+                        dev_node=$(echo "$attach_output" | grep "Apple_APFS" | grep -oE '/dev/disk[0-9]+s[0-9]+' | head -1)
+                        if [ -z "$dev_node" ]; then
+                            # Fallback: get the container device
+                            dev_node=$(echo "$attach_output" | grep -oE '/dev/disk[0-9]+' | head -1)
+                        fi
                         
                         if [ -n "$dev_node" ]; then
-                            # 3. Run fsck_apfs on the raw device node
+                            # 3. Run fsck_apfs on the device node
                             log "SMB" "Running fsck_apfs on $dev_node..."
                             local fsck_output
-                            fsck_output=$(/sbin/fsck_apfs -q -y "$dev_node" 2>&1)
+                            fsck_output=$(/sbin/fsck_apfs -y "$dev_node" 2>&1)
                             log "SMB" "fsck_apfs result: $fsck_output"
                             
-                            # 4. Detach the nomount attachment
-                            /usr/bin/hdiutil detach "$dev_node" -force 2>/dev/null
+                            # 4. Detach using the whole disk device
+                            whole_disk=$(echo "$dev_node" | grep -oE '/dev/disk[0-9]+')
+                            /usr/bin/hdiutil detach "$whole_disk" -force 2>/dev/null
                             sleep 2
                         else
-                            log "SMB" "WARNING: Could not get device node for fsck. Trying diskutil repair..."
+                            log "SMB" "WARNING: Could not get device node for fsck."
                         fi
                         
                         # 5. Re-attach the bundle (now with fsck already done)
@@ -281,6 +350,11 @@ function mount_smb() {
             fi
         else
             log "SMB" "Sparse Bundle already mounted."
+        fi
+        
+        # Start health monitor if volume is mounted
+        if [ -d "/Volumes/$BUNDLE_VOLUME_NAME" ]; then
+            monitor_bundle_health &
         fi
     fi
     
@@ -339,6 +413,9 @@ function mount_rclone() {
 # ====================
 
 echo "=== Mount Session Started: $(date) ==="
+
+# Clean up background processes on exit
+trap 'kill $(jobs -p) 2>/dev/null' EXIT
 
 # Check for updates before mounting
 check_and_update
