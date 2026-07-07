@@ -15,7 +15,7 @@
 ├── 📜 [LICENSE](LICENSE) — MIT License  
 ├── 🛠️ [mount_manager.sh](mount_manager.sh) — Core script: Auto-mounts SMB/Rclone  
 ├── ⚙️ [mount_manager.example.local.sh](mount_manager.example.local.sh) — Example local config (copy to `mount_manager.local.sh`)  
-├── ⚙️ [com.example.mountmanager.plist](com.example.mountmanager.plist) — LaunchAgent for mount script  
+├── ⚙️ [com.lazymount.plist](com.lazymount.plist) — LaunchAgent for mount script  
 └── 🧠 [com.ollama.startup.plist](com.ollama.startup.plist) — LaunchAgent for Ollama Service (AI)  
 
 
@@ -129,7 +129,7 @@ cp mount_manager.example.local.sh ~/Scripts/mount_manager.local.sh
 nano ~/Scripts/mount_manager.local.sh  # Edit with your settings
 
 # 4. Install LaunchAgent for auto-start
-cp com.example.mountmanager.plist ~/Library/LaunchAgents/com.lazymount.plist
+cp com.lazymount.plist ~/Library/LaunchAgents/com.lazymount.plist
 # Edit the plist to use your username:
 sed -i '' "s/YOUR_USERNAME/$(whoami)/g" ~/Library/LaunchAgents/com.lazymount.plist
 
@@ -598,7 +598,7 @@ tail -f /tmp/mount_manager.log
 
 ```bash
 # Download the LaunchAgent plist
-curl -o ~/Library/LaunchAgents/com.lazymount.plist https://raw.githubusercontent.com/yuanweize/LazyMount-Mac/main/com.example.mountmanager.plist
+curl -o ~/Library/LaunchAgents/com.lazymount.plist https://raw.githubusercontent.com/yuanweize/LazyMount-Mac/main/com.lazymount.plist
 
 # Replace YOUR_USERNAME with your actual username
 sed -i '' "s/YOUR_USERNAME/$(whoami)/g" ~/Library/LaunchAgents/com.lazymount.plist

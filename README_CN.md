@@ -15,7 +15,7 @@
 ├── 📜 [LICENSE](LICENSE) — MIT 许可证  
 ├── 🛠️ [mount_manager.sh](mount_manager.sh) — 核心脚本：自动挂载 SMB/Rclone  
 ├── ⚙️ [mount_manager.example.local.sh](mount_manager.example.local.sh) — 本地配置示例（复制为 `mount_manager.local.sh` 使用）  
-├── ⚙️ [com.example.mountmanager.plist](com.example.mountmanager.plist) — 挂载脚本的 LaunchAgent 配置  
+├── ⚙️ [com.lazymount.plist](com.lazymount.plist) — 挂载脚本的 LaunchAgent 配置  
 └── 🧠 [com.ollama.startup.plist](com.ollama.startup.plist) — Ollama 服务启动配置 (AI)  
 
 
@@ -129,7 +129,7 @@ cp mount_manager.example.local.sh ~/Scripts/mount_manager.local.sh
 nano ~/Scripts/mount_manager.local.sh  # 编辑你的配置
 
 # 4. 安装 LaunchAgent 实现开机自启
-cp com.example.mountmanager.plist ~/Library/LaunchAgents/com.lazymount.plist
+cp com.lazymount.plist ~/Library/LaunchAgents/com.lazymount.plist
 # 把 YOUR_USERNAME 替换成你的用户名：
 sed -i '' "s/YOUR_USERNAME/$(whoami)/g" ~/Library/LaunchAgents/com.lazymount.plist
 
@@ -598,7 +598,7 @@ tail -f /tmp/mount_manager.log
 
 ```bash
 # 下载 LaunchAgent 配置文件
-curl -o ~/Library/LaunchAgents/com.lazymount.plist https://raw.githubusercontent.com/yuanweize/LazyMount-Mac/main/com.example.mountmanager.plist
+curl -o ~/Library/LaunchAgents/com.lazymount.plist https://raw.githubusercontent.com/yuanweize/LazyMount-Mac/main/com.lazymount.plist
 
 # 把 YOUR_USERNAME 替换成你的用户名
 sed -i '' "s/YOUR_USERNAME/$(whoami)/g" ~/Library/LaunchAgents/com.lazymount.plist
