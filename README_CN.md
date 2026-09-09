@@ -1,4 +1,4 @@
-# LazyMount-Mac 🚀
+# LazyMount-Mac
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-macOS-blue.svg)](https://www.apple.com/macos/)
@@ -7,55 +7,62 @@
 
 > **轻松扩展 Mac 存储空间** — 开机自动挂载 SMB 共享和云存储，全程无需手动操作。
 
-## 📂 项目结构
+## 项目结构
 
 .  
-├── 📜 [README.md](README.md) — 英文文档  
-├── 📜 [README_CN.md](README_CN.md) — 中文文档  
-├── 📜 [LICENSE](LICENSE) — MIT 许可证  
-├── 🛠️ [mount_manager.sh](mount_manager.sh) — 核心脚本：自动挂载 SMB/Rclone  
-├── ⚙️ [mount_manager.example.local.sh](mount_manager.example.local.sh) — 本地配置示例（复制为 `mount_manager.local.sh` 使用）  
-├── ⚙️ [com.lazymount.plist](com.lazymount.plist) — 挂载脚本的 LaunchAgent 配置  
-└── 🧠 [com.ollama.startup.plist](com.ollama.startup.plist) — Ollama 服务启动配置 (AI)  
+├──[README.md](README.md) — 英文文档  
+├──[README_CN.md](README_CN.md) — 中文文档  
+├──[LICENSE](LICENSE) — MIT 许可证  
+├──[mount_manager.sh](mount_manager.sh) — 核心脚本：自动挂载 SMB/Rclone  
+├──[mount_manager.example.local.sh](mount_manager.example.local.sh) — 本地配置示例（复制为 `mount_manager.local.sh` 使用）  
+├──[com.lazymount.plist](com.lazymount.plist) — 挂载脚本的 LaunchAgent 配置  
+└──[com.ollama.startup.plist](com.ollama.startup.plist) — Ollama 服务启动配置 (AI)  
 
 
 ---
 
-## 📖 目录 (Table of Contents)
+## 目录 (Table of Contents)
 
-- [✨ 为什么选择 LazyMount？](#-为什么选择-lazymount)
-- [📦 安装](#-安装)
+- [为什么选择 LazyMount？](#为什么选择-lazymount)
+- [安装](#安装)
   - [前置要求](#前置要求)
   - [安装 FUSE 接口](#fuse-install)
-- [⚙️ 配置说明](#configuration)
-- [🌍 使用 Tailscale 远程访问](#-使用-tailscale-远程访问)
-- [🎮 使用场景示例](#-使用场景示例)
-- [📚 新手详细教程](#-新手详细教程)
-- [❓ 常见问题 (FAQ)](#faq)
+- [配置说明](#configuration)
+- [使用 Tailscale 远程访问](#使用-tailscale-远程访问)
+- [使用场景示例](#使用场景示例)
+- [新手详细教程](#新手详细教程)
+- [常见问题 (FAQ)](#faq)
 
 ---
 
-## ✨ 为什么选择 LazyMount？
+<div align="center">
+  <img src="assets/terminal-log.png" width="850" alt="LazyMount 终端执行日志">
+  <p><em>LazyMount-Mac 终端运行日志 — 网络连通性检测、凭据安全校验与自动化挂载状态恢复</em></p>
+</div>
+
+---
+
+## 为什么选择 LazyMount？
 
 Mac 存储空间**太贵了** — 升级 1TB 要多花 ¥1500+。LazyMount 帮你用外部存储无缝扩展 Mac：
 
-- 🎮 **[游戏库](#1-nas-上的-steam-游戏库)** — 把 Steam/Epic 游戏放在 NAS 上，玩起来跟本地一样
-- 💾 **[时间机器备份](#2-时间机器备份到远程服务器)** — 自动备份到远程服务器
-- 🎬 **[媒体库](#3-媒体服务器-plex-jellyfin-片源)** — 随时访问存放在家庭服务器上的电影/音乐
-- 📁 **[项目归档](#5-公司项目归档)** — 大文件放在便宜的存储上，按需访问
-- ☁️ **[云存储](#4-google-drive-dropbox-当本地文件夹)** — 把 Google Drive、Dropbox 或任何 rclone 支持的服务挂载成本地文件夹
-- 🧠 **[AI 模型存储](#6-ai-大模型存储库)** — 将大模型存放在网络驱动器上，节省本地 SSD 空间
+- **[游戏库](#1-nas-上的-steam-游戏库)** — 把 Steam/Epic 游戏放在 NAS 上，玩起来跟本地一样
+- **[时间机器备份](#2-时间机器备份到远程服务器)** — 自动备份到远程服务器
+- **[媒体库](#3-媒体服务器-plex-jellyfin-片源)** — 随时访问存放在家庭服务器上的电影/音乐
+- **[项目归档](#5-公司项目归档)** — 大文件放在便宜的存储上，按需访问
+- **[云存储](#4-google-drive-dropbox-当本地文件夹)** — 把 Google Drive、Dropbox 或任何 rclone 支持的服务挂载成本地文件夹
+- **[AI 模型存储](#6-ai-大模型存储库)** — 将大模型存放在网络驱动器上，节省本地 SSD 空间
 
 **核心特性 (v2.3)：**
-- 🔄 **开机自动挂载** — 不用手动点击
-- 🛡️ **自动恢复守护** — 后台持续监控 APFS 健康状态，使用轻量级 `df` 检测避免 APFS-over-SMB sync 限制导致的误判，仅在卷真正无响应时触发重连恢复
-- 🌐 **随处可用** — 通过 Tailscale 远程访问家里的存储
-- ⚡ **双模式** — 同时支持 SMB（局域网）和 Rclone（云存储/远程）
-- 🚀 **极速挂载** — 跳过网络镜像低效校验，APFS 磁盘映像挂载速度提升 3 倍
+- **开机自动挂载** — 不用手动点击
+- **自动恢复守护** — 后台持续监控 APFS 健康状态，使用轻量级 `df` 检测避免 APFS-over-SMB sync 限制导致的误判，仅在卷真正无响应时触发重连恢复
+- **随处可用** — 通过 Tailscale 远程访问家里的存储
+- **双模式** — 同时支持 SMB（局域网）和 Rclone（云存储/远程）
+- **极速挂载** — 跳过网络镜像低效校验，APFS 磁盘映像挂载速度提升 3 倍
 
 ---
 
-## 📦 安装
+## 安装
 
 ### 前置要求
 
@@ -74,8 +81,8 @@ Mac 存储空间**太贵了** — 升级 1TB 要多花 ¥1500+。LazyMount 帮�
    | 特性 | **方案 A: FUSE-T** (推荐) | **方案 B: macFUSE** (传统) |
    | :--- | :--- | :--- |
    | **类型** | 用户态 (NFS 桥接) | 内核扩展 (Kernel Extension) |
-   | **安全性** | ✅ **安全** (无需动 SIP) | ⚠️ **低** (需在恢复模式降低安全性) |
-   | **稳定性** | ✅ 高 (使用原生 macOS NFS) | ⚠️ 有内核崩溃风险 |
+   | **安全性** | ✅ **安全** (无需动 SIP) | **低** (需在恢复模式降低安全性) |
+   | **稳定性** | ✅ 高 (使用原生 macOS NFS) | 有内核崩溃风险 |
    | **适用** | macOS 12+ / Apple Silicon (M系芯片) | Intel Mac / 旧版软件 |
 
    **安装 FUSE-T (推荐):**
@@ -257,7 +264,7 @@ AUTO_UPDATE_ENABLED="true"    # 设为 "false" 禁用自动更新
 
 ---
 
-## 🌍 使用 Tailscale 远程访问
+## 使用 Tailscale 远程访问
 
 LazyMount 完美配合 [Tailscale](https://tailscale.com/)，让你在任何地方都能访问家里的存储。
 
@@ -314,7 +321,7 @@ LazyMount 完美配合 [Tailscale](https://tailscale.com/)，让你在任何地�
 
 ---
 
-## 🎮 使用场景示例
+## 使用场景示例
 
 ### 1. NAS 上的 Steam 游戏库
 
@@ -439,7 +446,7 @@ RCLONE_IP="192.168.1.10"
 - 下次对话需要重新加载整个模型
 - 快网络 = 快速加载模型 = 更好的使用体验
 
-### 🧠 Ollama 服务配置（可选）
+### Ollama 服务配置（可选）
 
 如果你希望 Ollama 在开机时自动启动，并利用网络驱动器（NAS）存储模型，同时允许局域网访问（0.0.0.0），请使用提供的配置文件：
 
@@ -457,7 +464,7 @@ RCLONE_IP="192.168.1.10"
 
 ---
 
-## 📚 新手详细教程
+## 新手详细教程
 
 第一次用终端/命令行？这个部分手把手教你每一步。
 
@@ -629,7 +636,7 @@ tail -20 /tmp/mount_manager.log
 
 ---
 
-## 🔧 管理命令
+## 管理命令
 
 ```bash
 # 查看状态
@@ -680,7 +687,7 @@ diskutil unmount force ~/Mounts/CloudStorage
 
 ---
 
-## ⚠️ 已知问题
+## 已知问题
 
 ### APFS 稀疏磁盘映像与重启
 如果你的 Mac 在关机时没有"优雅断开"（例如断电、强制重启、死机），Steam/Epic 游戏库使用的 APFS 磁盘映像可能会出现数据校验错误。这会导致磁盘变为 **只读** 状态，或者无法写入新游戏数据。
@@ -706,25 +713,25 @@ apfs_vfsop_sync:5310: disk5s1 disk5: failed to finish all transactions in sync()
 
 ---
 
-## 🛠️ 进阶存储管理
+## 进阶存储管理
 
 **[AppPorts](https://github.com/wzh4869/AppPorts)** — *外接硬盘拯救世界！*
 
 > LazyMount 的最佳拍档。LazyMount 负责**连接**存储，AppPorts 负责**应用程序**。
 
-*   📦 **应用瘦身**：一键将巨大应用（Logic Pro, Xcode, 游戏）迁移到外置硬盘/NAS。
-*   🔗 **无缝链接**：独家 "App Portal" 技术，让系统误以为应用还在本地，不影响任何功能。
-*   🛡️ **安全可靠**：专为 macOS 目录结构优化，支持随时一键还原。
+* **应用瘦身**：一键将巨大应用（Logic Pro, Xcode, 游戏）迁移到外置硬盘/NAS。
+* **无缝链接**：独家 "App Portal" 技术，让系统误以为应用还在本地，不影响任何功能。
+* **安全可靠**：专为 macOS 目录结构优化，支持随时一键还原。
 
 ---
 
-## 📄 许可证
+## 许可证
 
 MIT License - 详见 [LICENSE](LICENSE)。
 
 ---
 
-## 🤝 贡献
+## 贡献
 
 欢迎提交 Pull Request！
 

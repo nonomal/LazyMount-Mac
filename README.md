@@ -1,4 +1,4 @@
-# LazyMount-Mac 🚀
+# LazyMount-Mac
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-macOS-blue.svg)](https://www.apple.com/macos/)
@@ -7,55 +7,62 @@
 
 > **Expand your Mac storage effortlessly** — Auto-mount SMB shares and cloud storage at boot, with zero manual intervention.
 
-## 📂 Project Structure
+## Project Structure
 
 .  
-├── 📜 [README.md](README.md) — English Documentation  
-├── 📜 [README_CN.md](README_CN.md) — Chinese Documentation  
-├── 📜 [LICENSE](LICENSE) — MIT License  
-├── 🛠️ [mount_manager.sh](mount_manager.sh) — Core script: Auto-mounts SMB/Rclone  
-├── ⚙️ [mount_manager.example.local.sh](mount_manager.example.local.sh) — Example local config (copy to `mount_manager.local.sh`)  
-├── ⚙️ [com.lazymount.plist](com.lazymount.plist) — LaunchAgent for mount script  
-└── 🧠 [com.ollama.startup.plist](com.ollama.startup.plist) — LaunchAgent for Ollama Service (AI)  
+├──[README.md](README.md) — English Documentation  
+├──[README_CN.md](README_CN.md) — Chinese Documentation  
+├──[LICENSE](LICENSE) — MIT License  
+├──[mount_manager.sh](mount_manager.sh) — Core script: Auto-mounts SMB/Rclone  
+├──[mount_manager.example.local.sh](mount_manager.example.local.sh) — Example local config (copy to `mount_manager.local.sh`)  
+├──[com.lazymount.plist](com.lazymount.plist) — LaunchAgent for mount script  
+└──[com.ollama.startup.plist](com.ollama.startup.plist) — LaunchAgent for Ollama Service (AI)  
 
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
-- [✨ Why LazyMount?](#-why-lazymount)
-- [📦 Installation](#-installation)
+- [Why LazyMount?](#why-lazymount)
+- [Installation](#installation)
   - [Prerequisites](#prerequisites)
   - [Install FUSE Interface](#fuse-install)
-- [⚙️ Configuration](#configuration)
-- [🌍 Remote Access (Tailscale)](#-remote-access-with-tailscale)
-- [🎮 Use Case Examples](#-use-case-examples)
-- [📚 Detailed Beginner's Guide](#-detailed-beginners-guide)
-- [❓ FAQ / Troubleshooting](#faq)
+- [Configuration](#configuration)
+- [Remote Access (Tailscale)](#remote-access-with-tailscale)
+- [Use Case Examples](#use-case-examples)
+- [Detailed Beginner's Guide](#detailed-beginners-guide)
+- [FAQ / Troubleshooting](#faq)
 
 ---
 
-## ✨ Why LazyMount?
+<div align="center">
+  <img src="assets/terminal-log.png" width="850" alt="LazyMount Terminal Execution Log">
+  <p><em>LazyMount-Mac runtime execution — network reachability check, credentials verification, and automated mount reconciliation</em></p>
+</div>
+
+---
+
+## Why LazyMount?
 
 Mac storage is **expensive** — a 1TB upgrade can cost $200+. LazyMount solves this by seamlessly extending your Mac with external storage:
 
-- 🎮 **[Game Libraries](#1-steam-game-library-on-nas)** — Store Steam/Epic games on a NAS, play them like local installs
-- 💾 **[Time Machine Backups](#2-time-machine-to-remote-server)** — Back up to a remote server automatically
-- 🎬 **[Media Libraries](#3-media-server-plex-jellyfin)** — Access your movie/music collection stored on a home server
-- 📁 **[Project Archives](#5-work-project-archives)** — Keep large files on cheaper storage, access them on-demand
-- ☁️ **[Cloud Storage](#4-google-drive-dropbox-as-local-folder)** — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
-- 🧠 **[AI Model Storage](#6-ai-llm-model-storage)** — Run large LLMs (Ollama) from network storage to save 100GB+ SSD space
+- **[Game Libraries](#1-steam-game-library-on-nas)** — Store Steam/Epic games on a NAS, play them like local installs
+- **[Time Machine Backups](#2-time-machine-to-remote-server)** — Back up to a remote server automatically
+- **[Media Libraries](#3-media-server-plex-jellyfin)** — Access your movie/music collection stored on a home server
+- **[Project Archives](#5-work-project-archives)** — Keep large files on cheaper storage, access them on-demand
+- **[Cloud Storage](#4-google-drive-dropbox-as-local-folder)** — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
+- **[AI Model Storage](#6-ai-llm-model-storage)** — Run large LLMs (Ollama) from network storage to save 100GB+ SSD space
 
 **Key Features (v2.3):**
-- 🔄 **Auto-mount at login** — No manual clicking required
-- 🛡️ **Self-healing** — Background health monitor detects unresponsive APFS volumes and auto-recovers (uses lightweight `df` checks, avoids false positives from APFS-over-SMB sync limitations)
-- 🌐 **Works anywhere** — Access home storage remotely via Tailscale
-- ⚡ **Dual-mode** — Supports both SMB (local) and Rclone (cloud/remote)
-- 🚀 **Fast APFS Mounting** — Bypasses slow network verification for 3x faster APFS attach times
+- **Auto-mount at login** — No manual clicking required
+- **Self-healing** — Background health monitor detects unresponsive APFS volumes and auto-recovers (uses lightweight `df` checks, avoids false positives from APFS-over-SMB sync limitations)
+- **Works anywhere** — Access home storage remotely via Tailscale
+- **Dual-mode** — Supports both SMB (local) and Rclone (cloud/remote)
+- **Fast APFS Mounting** — Bypasses slow network verification for 3x faster APFS attach times
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 
@@ -74,8 +81,8 @@ Mac storage is **expensive** — a 1TB upgrade can cost $200+. LazyMount solves 
    | Feature | **Option A: FUSE-T** (Recommended) | **Option B: macFUSE** (Legacy) |
    | :--- | :--- | :--- |
    | **Type** | User-space (NFS Bridging) | Kernel Extension (Kext) |
-   | **Security** | ✅ **Safe** (No SIP changes) | ⚠️ **Low** (Must reduce security in Recovery Mode) |
-   | **Stability** | ✅ High (Uses native macOS NFS) | ⚠️ Risk of kernel panics |
+   | **Security** | ✅ **Safe** (No SIP changes) | **Low** (Must reduce security in Recovery Mode) |
+   | **Stability** | ✅ High (Uses native macOS NFS) | Risk of kernel panics |
    | **Best for** | macOS 12+ / Apple Silicon (M-Series) | Intel Macs / Legacy software |
 
    **To install FUSE-T (Recommended):**
@@ -252,7 +259,7 @@ When enabled, the script will:
 
 ---
 
-## 🌍 Remote Access with Tailscale
+## Remote Access with Tailscale
 
 LazyMount works beautifully with [Tailscale](https://tailscale.com/) for accessing your home storage from anywhere.
 
@@ -309,7 +316,7 @@ Now your Mac can access `192.168.1.x` addresses even when you're at a coffee sho
 
 ---
 
-## 🎮 Use Case Examples
+## Use Case Examples
 
 ### 1. Steam Game Library on NAS
 
@@ -439,7 +446,7 @@ LLM models need to be loaded into RAM before inference. If your model isn't in l
 - Next query requires reloading the full model from network
 - Fast network = quick model loading = better experience
 
-### 🧠 Ollama Service Setup (Optional)
+### Ollama Service Setup (Optional)
 
 If you want Ollama to start automatically at boot and serve models from your network drive (0.0.0.0), use the provided plist:
 
@@ -457,7 +464,7 @@ If you want Ollama to start automatically at boot and serve models from your net
 
 ---
 
-## 📚 Detailed Beginner's Guide
+## Detailed Beginner's Guide
 
 New to terminal/command line? This section walks you through everything step-by-step.
 
@@ -629,7 +636,7 @@ tail -20 /tmp/mount_manager.log
 
 ---
 
-## 🔧 Management Commands
+## Management Commands
 
 ```bash
 # Check status
@@ -677,7 +684,7 @@ diskutil unmount force ~/Mounts/CloudStorage
 
 ---
 
-## ⚠️ Known Issues
+## Known Issues
 
 ### APFS Sparse Bundle & Reboot
 If your Mac is not shut down gracefully (e.g., power loss, forced reboot), the APFS sparse bundle used for Game Libraries might report data verification issues. This can cause the volume to become **read-only** or refuse to write data.
@@ -703,26 +710,26 @@ apfs_vfsop_sync:5310: disk5s1 disk5: failed to finish all transactions in sync()
 
 ---
 
-## 🛠️ Advanced Storage Management
+## Advanced Storage Management
 
 **[AppPorts](https://github.com/wzh4869/AppPorts)** — *External drives save the world!*
 
 > A perfect companion for LazyMount. While LazyMount handles the **connection**, AppPorts handles the **applications**.
 
-*   📦 **App Slimming**: One-click migration of multi-gigabyte applications (Logic Pro, Xcode, Games) to your external drives.
-*   🔗 **Seamless Linking**: Creates "App Portals" so macOS treats apps as if they are still local.
-*   🛡️ **Safety First**: Optimized for macOS directory structure, with one-click restore anytime.
+* **App Slimming**: One-click migration of multi-gigabyte applications (Logic Pro, Xcode, Games) to your external drives.
+* **Seamless Linking**: Creates "App Portals" so macOS treats apps as if they are still local.
+* **Safety First**: Optimized for macOS directory structure, with one-click restore anytime.
 
 
 ---
 
-## 📄 License
+## License
 
 MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please feel free to submit pull requests.
 
