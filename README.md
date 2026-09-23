@@ -31,6 +31,11 @@
 - [Remote Access (Tailscale)](#remote-access-with-tailscale)
 - [Use Case Examples](#use-case-examples)
 - [Detailed Beginner's Guide](#detailed-beginners-guide)
+- [Technical Guides & Troubleshooting](#technical-guides--troubleshooting)
+  - [Fixing Steam Disk Write Error on macOS](docs/troubleshooting/steam-disk-write-error-macos.md)
+  - [APFS Sparsebundle NAS Recovery & Optimization](docs/guides/apfs-sparsebundle-nas-recovery.md)
+  - [Automounting SMB Shares Using Launchd](docs/guides/macos-automount-smb-launchd.md)
+  - [Rclone Mount with FUSE-T & Launchd](docs/guides/rclone-launchd-macos.md)
 - [FAQ / Troubleshooting](#faq)
 
 ---
@@ -53,12 +58,31 @@ Mac storage is **expensive** — a 1TB upgrade can cost $200+. LazyMount solves 
 - **[Cloud Storage](#4-google-drive-dropbox-as-local-folder)** — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
 - **[AI Model Storage](#6-ai-llm-model-storage)** — Run large LLMs (Ollama) from network storage to save 100GB+ SSD space
 
-**Key Features (v2.3):**
+**Key Features (v2.4):**
 - **Auto-mount at login** — No manual clicking required
 - **Self-healing** — Background health monitor detects unresponsive APFS volumes and auto-recovers (uses lightweight `df` checks, avoids false positives from APFS-over-SMB sync limitations)
 - **Works anywhere** — Access home storage remotely via Tailscale
 - **Dual-mode** — Supports both SMB (local) and Rclone (cloud/remote)
-- **Fast APFS Mounting** — Bypasses slow network verification for 3x faster APFS attach times
+- **Optimized APFS Mounting** — Bypasses redundant remote checksum calculation via the `-noverify` flag to accelerate APFS attach over network shares
+
+---
+
+## Architecture & Lifecycle
+
+```mermaid
+graph TD
+    Boot["macOS Boot / User Login"] --> Launchd["Launchd Agent (com.lazymount.plist)"]
+    Launchd --> Script["mount_manager.sh (v2.4)"]
+    Script --> NetCheck{"Network & Tailscale Check"}
+    NetCheck -- Reachable --> Mounts["Mount Targets"]
+    NetCheck -- Unreachable --> Retry["Exponential Backoff & Retry"]
+    Mounts --> SMB["SMB Network Shares"]
+    Mounts --> Rclone["Rclone VFS (SFTP/Cloud)"]
+    SMB --> APFS["Attach APFS Sparsebundles (-noverify)"]
+    APFS --> HealthMon["Background Health Monitor"]
+    HealthMon -- Timeout / Hang --> AutoHeal["Auto Force-Unmount & Recovery"]
+    HealthMon -- OK --> Notify["Native macOS Notifications"]
+```
 
 ---
 
