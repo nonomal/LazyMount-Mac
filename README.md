@@ -58,7 +58,7 @@ Mac storage is **expensive** — a 1TB upgrade can cost $200+. LazyMount solves 
 - **Self-healing** — Background health monitor detects unresponsive APFS volumes and auto-recovers (uses lightweight `df` checks, avoids false positives from APFS-over-SMB sync limitations)
 - **Works anywhere** — Access home storage remotely via Tailscale
 - **Dual-mode** — Supports both SMB (local) and Rclone (cloud/remote)
-- **Fast APFS Mounting** — Bypasses slow network verification for 3x faster APFS attach times
+- **Optimized APFS Mounting** — Bypasses redundant remote checksum calculation via the `-noverify` flag to accelerate APFS attach over network shares
 
 ---
 
