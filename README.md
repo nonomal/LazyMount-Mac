@@ -31,6 +31,11 @@
 - [Remote Access (Tailscale)](#remote-access-with-tailscale)
 - [Use Case Examples](#use-case-examples)
 - [Detailed Beginner's Guide](#detailed-beginners-guide)
+- [Technical Guides & Troubleshooting](#technical-guides--troubleshooting)
+  - [Fixing Steam Disk Write Error on macOS](docs/troubleshooting/steam-disk-write-error-macos.md)
+  - [APFS Sparsebundle NAS Recovery & Optimization](docs/guides/apfs-sparsebundle-nas-recovery.md)
+  - [Automounting SMB Shares Using Launchd](docs/guides/macos-automount-smb-launchd.md)
+  - [Rclone Mount with FUSE-T & Launchd](docs/guides/rclone-launchd-macos.md)
 - [FAQ / Troubleshooting](#faq)
 
 ---

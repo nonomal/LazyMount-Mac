@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://yuanweize.github.io/LazyMount-Mac/sitemap.xml
